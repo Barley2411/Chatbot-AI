@@ -1,0 +1,5 @@
+{
+  "name": "Đoàn Thanh niên AI",
+  "description": "Trợ lý ảo thông minh chuyên giải đáp về Đoàn Thanh niên Cộng sản Hồ Chí Minh.",
+  "requestFramePermissions": ["microphone"]
+}

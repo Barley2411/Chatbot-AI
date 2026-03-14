@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: chats
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required) - The UID of the user who owns this chat
+    //   - title: string (required, max 100 chars) - The title of the chat session
+    //   - createdAt: timestamp (required) - When the chat was created
+    //   - updatedAt: timestamp (required) - When the chat was last updated
+    //   - messages: list (required, max 1000 items) - The messages in the chat
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidMessagesList(msgs) {
+      return msgs is list && msgs.size() <= 1000;
+    }
+
+    function isValidChat(data) {
+      return hasOnlyAllowedFields(['userId', 'title', 'createdAt', 'updatedAt', 'messages']) &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.title is string && data.title.size() <= 100 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             isValidMessagesList(data.messages);
+    }
+
+    match /chats/{chatId} {
+      allow read: if isDocOwner();
+      allow delete: if isDocOwner();
+      allow create: if isAuthenticated() && 
+                    isValidChat(request.resource.data) && 
+                    request.resource.data.userId == request.auth.uid;
+      allow update: if isDocOwner() && 
+                    isValidChat(request.resource.data) && 
+                    uidNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+    }
+  }
+}

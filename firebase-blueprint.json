@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "Chat": {
+      "title": "Chat",
+      "description": "A chat session between a user and the AI",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who owns this chat"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the chat session"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "When the chat was created"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "description": "When the chat was last updated"
+        },
+        "messages": {
+          "type": "array",
+          "description": "The messages in the chat",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "role": { "type": "string", "enum": ["user", "ai"] },
+              "content": { "type": "string" },
+              "timestamp": { "type": "timestamp" }
+            }
+          }
+        }
+      },
+      "required": ["userId", "title", "createdAt", "updatedAt", "messages"]
+    }
+  },
+  "firestore": {
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "Stores user chat sessions"
+    }
+  }
+}
