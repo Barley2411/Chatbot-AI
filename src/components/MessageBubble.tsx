@@ -1,6 +1,6 @@
-import { Message } from '../types';
+import { Message, Attachment } from '../types';
 import { clsx } from 'clsx';
-import { Copy, Check, User as UserIcon, ShieldCheck, RefreshCw, X } from 'lucide-react';
+import { Copy, Check, User as UserIcon, ShieldCheck, RefreshCw, X, Download } from 'lucide-react';
 import React, { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -21,6 +21,16 @@ export function MessageBubble({ message, onRetry, user }: MessageBubbleProps) {
     navigator.clipboard.writeText(message.content);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleDownloadImage = (e: React.MouseEvent, att: Attachment) => {
+    e.stopPropagation();
+    const link = document.createElement('a');
+    link.href = `data:${att.mimeType || 'image/png'};base64,${att.data}`;
+    link.download = att.name || 'generated-image.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (isUser) {
@@ -64,6 +74,21 @@ export function MessageBubble({ message, onRetry, user }: MessageBubbleProps) {
             onClick={() => setFullscreenImage(null)}
           >
             <button 
+              className="absolute top-4 right-16 p-2 text-white/70 hover:text-white bg-black/50 hover:bg-black/80 rounded-full transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = fullscreenImage;
+                link.download = 'generated-image.png';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              title="Tải ảnh xuống"
+            >
+              <Download className="w-6 h-6" />
+            </button>
+            <button 
               className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-black/50 hover:bg-black/80 rounded-full transition-all"
               onClick={(e) => {
                 e.stopPropagation();
@@ -105,6 +130,32 @@ export function MessageBubble({ message, onRetry, user }: MessageBubbleProps) {
           </Markdown>
         </div>
 
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {message.attachments.map((att, i) => (
+              <div key={i} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+                {(att.mimeType?.startsWith('image/') || !att.mimeType) && att.data ? (
+                  <div className="relative group/img">
+                    <img 
+                      src={`data:${att.mimeType || 'image/png'};base64,${att.data}`} 
+                      alt={att.name} 
+                      className="h-64 w-auto object-cover cursor-pointer hover:opacity-90 transition-opacity" 
+                      onClick={() => setFullscreenImage(`data:${att.mimeType || 'image/png'};base64,${att.data}`)}
+                    />
+                    <button
+                      onClick={(e) => handleDownloadImage(e, att)}
+                      className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"
+                      title="Tải ảnh xuống"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mt-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity md:opacity-100">
           <button
             onClick={handleCopy}
@@ -124,6 +175,44 @@ export function MessageBubble({ message, onRetry, user }: MessageBubbleProps) {
             </button>
           )}
         </div>
+        {/* Fullscreen Image Modal for AI */}
+        {fullscreenImage && (
+          <div 
+            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setFullscreenImage(null)}
+          >
+            <button 
+              className="absolute top-4 right-16 p-2 text-white/70 hover:text-white bg-black/50 hover:bg-black/80 rounded-full transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = fullscreenImage;
+                link.download = 'generated-image.png';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              title="Tải ảnh xuống"
+            >
+              <Download className="w-6 h-6" />
+            </button>
+            <button 
+              className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-black/50 hover:bg-black/80 rounded-full transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFullscreenImage(null);
+              }}
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img 
+              src={fullscreenImage} 
+              alt="Fullscreen view" 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

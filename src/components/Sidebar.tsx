@@ -1,4 +1,4 @@
-import { MessageSquarePlus, History, BookOpen, Users, Flag, GraduationCap, Trash2, PanelLeftClose, PanelLeftOpen, X, Search } from 'lucide-react';
+import { MessageSquarePlus, History, BookOpen, Users, Flag, GraduationCap, Trash2, PanelLeftClose, PanelLeftOpen, X, Search, CheckSquare, Square } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Chat } from '../types';
 import { useState } from 'react';
@@ -12,6 +12,8 @@ interface SidebarProps {
   currentChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
+  onDeleteAllChats: () => void;
+  onDeleteMultipleChats: (chatIds: string[]) => void;
   onToggle: () => void;
 }
 
@@ -23,9 +25,19 @@ const TOPICS = [
   { id: 'school', label: 'Công tác phát triển', icon: GraduationCap, prompt: 'Quy trình kết nạp một thanh niên ưu tú vào Trung ương Đoàn TNCS Hồ Chí Minh gồm những bước nào?' },
 ];
 
-export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, currentChatId, onSelectChat, onDeleteChat, onToggle }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, currentChatId, onSelectChat, onDeleteChat, onDeleteAllChats, onDeleteMultipleChats, onToggle }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedChats, setSelectedChats] = useState<string[]>([]);
   const filteredChats = chats.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const toggleChatSelection = (chatId: string) => {
+    setSelectedChats(prev => 
+      prev.includes(chatId) ? prev.filter(id => id !== chatId) : [...prev, chatId]
+    );
+  };
 
   return (
     <>
@@ -96,21 +108,74 @@ export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, curr
           </div>
 
           <div>
-            <h3 className="text-xs font-semibold text-slate-500 px-2 mb-2">
-              Lịch sử trò chuyện
-            </h3>
-            <div className="px-2 mb-3">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm đoạn chat..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-black/5 border-none rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-700 placeholder-slate-500 focus:ring-1 focus:ring-slate-300 outline-none"
-                />
-              </div>
+            <div className="flex items-center justify-between px-2 mb-2">
+              <h3 className="text-xs font-semibold text-slate-500">
+                Lịch sử trò chuyện
+              </h3>
+              {chats.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (isEditMode) {
+                      setIsEditMode(false);
+                      setSelectedChats([]);
+                    } else {
+                      setIsEditMode(true);
+                    }
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors"
+                >
+                  {isEditMode ? 'Xong' : 'Chọn'}
+                </button>
+              )}
             </div>
+            
+            {isEditMode && (
+              <div className="flex items-center justify-between px-2 mb-3">
+                <button
+                  onClick={() => {
+                    if (selectedChats.length === filteredChats.length) {
+                      setSelectedChats([]);
+                    } else {
+                      setSelectedChats(filteredChats.map(c => c.id));
+                    }
+                  }}
+                  className="text-xs text-slate-600 hover:text-slate-800 font-medium"
+                >
+                  {selectedChats.length === filteredChats.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-xs text-red-500 hover:text-red-600 font-medium"
+                  >
+                    Xóa tất cả
+                  </button>
+                  {selectedChats.length > 0 && (
+                    <button
+                      onClick={() => setShowDeleteSelectedConfirm(true)}
+                      className="text-xs text-red-500 hover:text-red-600 font-medium"
+                    >
+                      Xóa ({selectedChats.length})
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!isEditMode && (
+              <div className="px-2 mb-3">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm đoạn chat..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-black/5 border-none rounded-lg pl-9 pr-3 py-1.5 text-sm text-slate-700 placeholder-slate-500 focus:ring-1 focus:ring-slate-300 outline-none"
+                  />
+                </div>
+              </div>
+            )}
             {filteredChats.length === 0 ? (
               <div className="text-sm text-slate-500 px-2">
                 {searchQuery ? 'Không tìm thấy kết quả.' : 'Chưa có lịch sử.'}
@@ -129,23 +194,38 @@ export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, curr
                   >
                     <button
                       onClick={() => {
-                        onSelectChat(chat.id);
-                        onClose();
+                        if (isEditMode) {
+                          toggleChatSelection(chat.id);
+                        } else {
+                          onSelectChat(chat.id);
+                          onClose();
+                        }
                       }}
                       className="flex items-center gap-3 text-left flex-1 min-w-0"
                     >
+                      {isEditMode && (
+                        <div className="flex-shrink-0 text-slate-400">
+                          {selectedChats.includes(chat.id) ? (
+                            <CheckSquare className="w-4 h-4 text-red-500" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </div>
+                      )}
                       <span className="truncate flex-1">{chat.title}</span>
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteChat(chat.id);
-                      }}
-                      className="p-1 rounded-md text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Xoá"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {!isEditMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteChat(chat.id);
+                        }}
+                        className="p-1 rounded-md text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Xoá"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -163,6 +243,68 @@ export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, curr
         >
           <PanelLeftOpen className="w-5 h-5" />
         </button>
+      )}
+
+      {/* Delete All Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Xóa tất cả lịch sử?</h3>
+            <p className="text-sm text-slate-600 mb-6">
+              Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện không? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteAllChats();
+                  setShowDeleteConfirm(false);
+                  setIsEditMode(false);
+                  setSelectedChats([]);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Xóa tất cả
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Selected Confirmation Modal */}
+      {showDeleteSelectedConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Xóa {selectedChats.length} mục đã chọn?</h3>
+            <p className="text-sm text-slate-600 mb-6">
+              Bạn có chắc chắn muốn xóa {selectedChats.length} cuộc trò chuyện đã chọn không? Hành động này không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteSelectedConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteMultipleChats(selectedChats);
+                  setShowDeleteSelectedConfirm(false);
+                  setIsEditMode(false);
+                  setSelectedChats([]);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

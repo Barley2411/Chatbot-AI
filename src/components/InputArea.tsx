@@ -1,4 +1,4 @@
-import { SendHorizontal, Loader2, Sparkles, AlignLeft, List, Zap, Mic, Paperclip, X, Image as ImageIcon, FileText, Cloud, HardDrive } from 'lucide-react';
+import { SendHorizontal, Loader2, Sparkles, AlignLeft, List, Zap, Mic, Paperclip, X, Image as ImageIcon, FileText } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { ResponseStyle, Attachment } from '../types';
@@ -22,21 +22,9 @@ export function InputArea({ onSendMessage, isLoading, user }: InputAreaProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
-  const attachMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (attachMenuRef.current && !attachMenuRef.current.contains(event.target as Node)) {
-        setShowAttachMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -67,6 +55,11 @@ export function InputArea({ onSendMessage, isLoading, user }: InputAreaProps) {
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files) return;
+    
+    if (!user) {
+      alert('Vui lòng đăng nhập bằng tài khoản Google để sử dụng chức năng đính kèm tệp.');
+      return;
+    }
     
     if (attachments.length + files.length > 10) {
       alert('Chỉ được phép tải lên tối đa 10 tệp đính kèm.');
@@ -208,6 +201,10 @@ export function InputArea({ onSendMessage, isLoading, user }: InputAreaProps) {
   const handlePaste = (e: React.ClipboardEvent) => {
     if (e.clipboardData.files.length > 0) {
       e.preventDefault();
+      if (!user) {
+        alert('Vui lòng đăng nhập bằng tài khoản Google để sử dụng chức năng dán ảnh/tệp.');
+        return;
+      }
       handleFileUpload(e.clipboardData.files);
     }
   };
@@ -296,59 +293,14 @@ export function InputArea({ onSendMessage, isLoading, user }: InputAreaProps) {
           <div className="flex items-center gap-1">
             <input type="file" multiple ref={fileInputRef} className="hidden" onChange={(e) => handleFileUpload(e.target.files)} />
             
-            <div className="relative" ref={attachMenuRef}>
-              <button 
-                type="button" 
-                onClick={() => setShowAttachMenu(!showAttachMenu)} 
-                className="p-2 rounded-full text-slate-500 hover:bg-slate-200 transition-colors" 
-                title="Đính kèm file"
-              >
-                <Paperclip className="w-5 h-5" />
-              </button>
-
-              {showAttachMenu && (
-                <div className="absolute bottom-full left-0 mb-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50 overflow-hidden">
-                  {user && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          alert(`Đã liên kết với Google Drive của tài khoản: ${user.email}`);
-                          setShowAttachMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <Cloud className="w-4 h-4 text-emerald-500" />
-                        Google Drive
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          alert(`Đã liên kết với OneDrive của tài khoản: ${user.email}`);
-                          setShowAttachMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <Cloud className="w-4 h-4 text-blue-500" />
-                        OneDrive
-                      </button>
-                      <div className="h-px bg-slate-100 my-1"></div>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      fileInputRef.current?.click();
-                      setShowAttachMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <HardDrive className="w-4 h-4 text-slate-500" />
-                    Từ máy tính
-                  </button>
-                </div>
-              )}
-            </div>
+            <button 
+              type="button" 
+              onClick={() => fileInputRef.current?.click()} 
+              className="p-2 rounded-full text-slate-500 hover:bg-slate-200 transition-colors" 
+              title="Đính kèm file"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
 
             <button 
               type="button" 

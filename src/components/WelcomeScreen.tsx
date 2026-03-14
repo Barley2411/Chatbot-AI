@@ -1,8 +1,11 @@
 import { Sparkles, BookOpen, Flag, Users, GraduationCap } from 'lucide-react';
 import { motion } from 'motion/react';
 
+import { User } from 'firebase/auth';
+
 interface WelcomeScreenProps {
   onTopicSelect: (topic: string) => void;
+  user?: User | null;
 }
 
 const SUGGESTIONS = [
@@ -44,7 +47,7 @@ const SUGGESTIONS = [
   }
 ];
 
-export function WelcomeScreen({ onTopicSelect }: WelcomeScreenProps) {
+export function WelcomeScreen({ onTopicSelect, user }: WelcomeScreenProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-6 md:p-12">
       <motion.div 
@@ -57,7 +60,7 @@ export function WelcomeScreen({ onTopicSelect }: WelcomeScreenProps) {
           <Sparkles className="w-8 h-8 text-red-600" />
         </div>
         <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 tracking-tight">
-          Xin chào, đồng chí!
+          Xin chào, đồng chí{user?.displayName ? ` ${user.displayName}` : ''}!
         </h2>
         <p className="text-lg text-slate-600 leading-relaxed">
           Tôi là <span className="font-semibold text-red-600">Trợ lý ảo Trung ương Đoàn TNCS Hồ Chí Minh</span>, chuyên giải đáp mọi thắc mắc về tổ chức Đoàn. Tôi có thể giúp gì cho đồng chí hôm nay?

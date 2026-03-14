@@ -205,6 +205,49 @@ export default function App() {
     }
   };
 
+  const handleDeleteAllChats = async () => {
+    if (user) {
+      try {
+        const deletePromises = chats.map(chat => deleteDoc(doc(db, 'chats', chat.id)));
+        await Promise.all(deletePromises);
+        setCurrentChatId(null);
+        setMessages([]);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `chats`);
+      }
+    } else {
+      setLocalChats([]);
+      saveLocalChats([]);
+      setCurrentChatId(null);
+      setMessages([]);
+    }
+  };
+
+  const handleDeleteMultipleChats = async (chatIds: string[]) => {
+    if (user) {
+      try {
+        const deletePromises = chatIds.map(id => deleteDoc(doc(db, 'chats', id)));
+        await Promise.all(deletePromises);
+        if (currentChatId && chatIds.includes(currentChatId)) {
+          setCurrentChatId(null);
+          setMessages([]);
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `chats`);
+      }
+    } else {
+      setLocalChats(prev => {
+        const updated = prev.filter(c => !chatIds.includes(c.id));
+        saveLocalChats(updated);
+        return updated;
+      });
+      if (currentChatId && chatIds.includes(currentChatId)) {
+        setCurrentChatId(null);
+        setMessages([]);
+      }
+    }
+  };
+
   const handleSendMessage = async (content: string, style: ResponseStyle, attachments?: { name: string; mimeType: string; data?: string }[]) => {
     const newUserMessage: Message = {
       id: Date.now().toString(),
@@ -330,6 +373,8 @@ export default function App() {
         currentChatId={currentChatId}
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
+        onDeleteAllChats={handleDeleteAllChats}
+        onDeleteMultipleChats={handleDeleteMultipleChats}
       />
       
       <main className="flex-1 flex flex-col h-full relative min-w-0">
@@ -341,7 +386,7 @@ export default function App() {
         
         <div className="flex-1 overflow-y-auto scroll-smooth">
           {messages.length === 0 ? (
-            <WelcomeScreen onTopicSelect={(topic) => handleSendMessage(topic, 'detailed')} />
+            <WelcomeScreen onTopicSelect={(topic) => handleSendMessage(topic, 'detailed')} user={user} />
           ) : (
             <div className="pb-4">
               {messages.map((msg, index) => (
