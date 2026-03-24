@@ -7,10 +7,6 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { Message, ResponseStyle, Chat } from './types';
 import { generateChatResponse } from './services/ai';
 import { Loader2 } from 'lucide-react';
-import { auth, db } from './firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, query, where, orderBy, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from './utils/errorHandling';
 
 const LOCAL_CHATS_KEY = 'dang_cong_san_ai_local_chats';
 
@@ -47,76 +43,42 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
-  const [localChats, setLocalChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(() => {
+    return sessionStorage.getItem('dang_cong_san_ai_current_chat_id') || null;
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setLocalChats(loadLocalChats());
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) {
-        setChats(loadLocalChats());
-        setCurrentChatId(null);
-        setMessages([]);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setChats(localChats);
-    }
-  }, [localChats, user]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
-      collection(db, 'chats'),
-      where('userId', '==', user.uid),
-      orderBy('updatedAt', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedChats: Chat[] = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          userId: data.userId,
-          title: data.title,
-          messages: data.messages.map((m: any) => ({
-            ...m,
-            timestamp: m.timestamp instanceof Timestamp ? m.timestamp.toDate() : new Date(m.timestamp),
-            style: m.style || undefined,
-            attachments: m.attachments || undefined
-          })),
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-          updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
-        };
-      });
-      setChats(fetchedChats);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'chats');
-    });
-
-    return () => unsubscribe();
-  }, [user]);
+  const pendingChatId = useRef<string | null>(null);
+  const [isChatsLoaded, setIsChatsLoaded] = useState(false);
 
   useEffect(() => {
     if (currentChatId) {
+      sessionStorage.setItem('dang_cong_san_ai_current_chat_id', currentChatId);
+    } else {
+      sessionStorage.removeItem('dang_cong_san_ai_current_chat_id');
+    }
+  }, [currentChatId]);
+
+  useEffect(() => {
+    const loadedChats = loadLocalChats();
+    setChats(loadedChats);
+    setIsChatsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (currentChatId && isChatsLoaded) {
       const chat = chats.find(c => c.id === currentChatId);
       if (chat) {
         setMessages(chat.messages);
+        if (pendingChatId.current === currentChatId) {
+          pendingChatId.current = null;
+        }
+      } else if (currentChatId !== pendingChatId.current) {
+        setCurrentChatId(null);
+        setMessages([]);
       }
     }
-  }, [currentChatId, chats]);
+  }, [currentChatId, chats, isChatsLoaded]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -127,124 +89,57 @@ export default function App() {
   }, [messages, isLoading]);
 
   const saveChat = async (chatId: string, newMessages: Message[], title: string, isNewChat: boolean) => {
-    if (user) {
-      const chatRef = doc(db, 'chats', chatId);
-      const messagesToSave = newMessages.map(m => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp,
-        style: m.style || null,
-        attachments: m.attachments?.map(a => ({ name: a.name, mimeType: a.mimeType })) || null
-      }));
-
-      try {
-        if (!isNewChat) {
-          await updateDoc(chatRef, {
-            messages: messagesToSave,
-            updatedAt: serverTimestamp()
-          });
-        } else {
-          await setDoc(chatRef, {
-            userId: user.uid,
-            title,
-            messages: messagesToSave,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
-        }
-      } catch (error) {
-        handleFirestoreError(error, isNewChat ? OperationType.CREATE : OperationType.UPDATE, `chats/${chatId}`);
+    setChats(prev => {
+      let updated;
+      if (isNewChat) {
+        updated = [{
+          id: chatId,
+          userId: 'local',
+          title,
+          messages: newMessages,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }, ...prev];
+      } else {
+        updated = prev.map(c => c.id === chatId ? {
+          ...c,
+          messages: newMessages,
+          updatedAt: new Date()
+        } : c);
       }
-    } else {
-      setLocalChats(prev => {
-        let updated;
-        if (isNewChat) {
-          updated = [{
-            id: chatId,
-            userId: 'local',
-            title,
-            messages: newMessages,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }, ...prev];
-        } else {
-          updated = prev.map(c => c.id === chatId ? {
-            ...c,
-            messages: newMessages,
-            updatedAt: new Date()
-          } : c);
-        }
-        saveLocalChats(updated);
-        return updated;
-      });
-    }
+      saveLocalChats(updated);
+      return updated;
+    });
   };
 
   const handleDeleteChat = async (chatId: string) => {
-    if (user) {
-      try {
-        await deleteDoc(doc(db, 'chats', chatId));
-        if (currentChatId === chatId) {
-          setCurrentChatId(null);
-          setMessages([]);
-        }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `chats/${chatId}`);
-      }
-    } else {
-      setLocalChats(prev => {
-        const updated = prev.filter(c => c.id !== chatId);
-        saveLocalChats(updated);
-        return updated;
-      });
-      if (currentChatId === chatId) {
-        setCurrentChatId(null);
-        setMessages([]);
-      }
-    }
-  };
-
-  const handleDeleteAllChats = async () => {
-    if (user) {
-      try {
-        const deletePromises = chats.map(chat => deleteDoc(doc(db, 'chats', chat.id)));
-        await Promise.all(deletePromises);
-        setCurrentChatId(null);
-        setMessages([]);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `chats`);
-      }
-    } else {
-      setLocalChats([]);
-      saveLocalChats([]);
+    setChats(prev => {
+      const updated = prev.filter(c => c.id !== chatId);
+      saveLocalChats(updated);
+      return updated;
+    });
+    if (currentChatId === chatId) {
       setCurrentChatId(null);
       setMessages([]);
     }
   };
 
+  const handleDeleteAllChats = async () => {
+    setChats([]);
+    saveLocalChats([]);
+    setCurrentChatId(null);
+    setMessages([]);
+  };
+
   const handleDeleteMultipleChats = async (chatIds: string[]) => {
-    if (user) {
-      try {
-        const deletePromises = chatIds.map(id => deleteDoc(doc(db, 'chats', id)));
-        await Promise.all(deletePromises);
-        if (currentChatId && chatIds.includes(currentChatId)) {
-          setCurrentChatId(null);
-          setMessages([]);
-        }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `chats`);
-      }
-    } else {
-      setLocalChats(prev => {
-        const updated = prev.filter(c => !chatIds.includes(c.id));
-        saveLocalChats(updated);
-        return updated;
-      });
-      if (currentChatId && chatIds.includes(currentChatId)) {
-        setCurrentChatId(null);
-        setMessages([]);
-      }
+    setChats(prev => {
+      const updated = prev.filter(c => !chatIds.includes(c.id));
+      saveLocalChats(updated);
+      return updated;
+    });
+    if (currentChatId && chatIds.includes(currentChatId)) {
+      setCurrentChatId(null);
+      setMessages([]);
     }
   };
 
@@ -268,6 +163,7 @@ export default function App() {
 
     if (!chatId) {
       chatId = Date.now().toString();
+      pendingChatId.current = chatId;
       setCurrentChatId(chatId);
     }
 
@@ -288,11 +184,16 @@ export default function App() {
       setMessages(finalMessages);
       
       await saveChat(chatId, finalMessages, title, false);
-    } catch (error) {
+    } catch (error: any) {
+      let errorText = 'Xin lỗi, tôi đang gặp sự cố kết nối. Đồng chí vui lòng thử lại sau nhé.';
+      if (error?.message === 'API_KEY_MISSING') {
+        errorText = 'Vui lòng cài đặt Gemini API Key trong phần Cài đặt (biểu tượng bánh răng ở thanh bên trái) để bắt đầu trò chuyện.';
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'ai',
-        content: 'Xin lỗi, tôi đang gặp sự cố kết nối. Đồng chí vui lòng thử lại sau nhé.',
+        content: errorText,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -331,11 +232,16 @@ export default function App() {
           const chat = chats.find(c => c.id === currentChatId);
           await saveChat(currentChatId, finalMessages, chat?.title || 'Chat', false);
         }
-      } catch (error) {
+      } catch (error: any) {
+        let errorText = 'Xin lỗi, tôi đang gặp sự cố kết nối. Đồng chí vui lòng thử lại sau nhé.';
+        if (error?.message === 'API_KEY_MISSING') {
+          errorText = 'Vui lòng cài đặt Gemini API Key trong phần Cài đặt (biểu tượng bánh răng ở thanh bên trái) để bắt đầu trò chuyện.';
+        }
+
         const errorMessage: Message = {
           id: Date.now().toString(),
           role: 'ai',
-          content: 'Xin lỗi, tôi đang gặp sự cố kết nối. Đồng chí vui lòng thử lại sau nhé.',
+          content: errorText,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, errorMessage]);
@@ -380,13 +286,13 @@ export default function App() {
       <main className="flex-1 flex flex-col h-full relative min-w-0">
         <Header 
           onMenuClick={() => setIsSidebarOpen(prev => !prev)} 
-          user={user} 
           currentChatTitle={chats.find(c => c.id === currentChatId)?.title}
+          isSidebarOpen={isSidebarOpen}
         />
         
         <div className="flex-1 overflow-y-auto scroll-smooth">
           {messages.length === 0 ? (
-            <WelcomeScreen onTopicSelect={(topic) => handleSendMessage(topic, 'detailed')} user={user} />
+            <WelcomeScreen onTopicSelect={(topic) => handleSendMessage(topic, 'detailed')} />
           ) : (
             <div className="pb-4">
               {messages.map((msg, index) => (
@@ -394,7 +300,6 @@ export default function App() {
                   key={msg.id} 
                   message={msg} 
                   onRetry={msg.role === 'ai' ? () => handleRetry(index) : undefined}
-                  user={user}
                 />
               ))}
               {isLoading && (
@@ -419,7 +324,7 @@ export default function App() {
         </div>
 
         <div className="bg-gradient-to-t from-white via-white to-transparent pt-6">
-          <InputArea onSendMessage={handleSendMessage} isLoading={isLoading} user={user} />
+          <InputArea onSendMessage={handleSendMessage} isLoading={isLoading} />
         </div>
       </main>
     </div>

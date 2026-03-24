@@ -1,7 +1,9 @@
-import { MessageSquarePlus, History, BookOpen, Users, Flag, GraduationCap, Trash2, PanelLeftClose, PanelLeftOpen, X, Search, CheckSquare, Square } from 'lucide-react';
+import { MessageSquarePlus, History, BookOpen, Users, Flag, GraduationCap, Trash2, PanelLeftClose, PanelLeftOpen, X, Search, CheckSquare, Square, Settings } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Chat } from '../types';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { SettingsModal } from './SettingsModal';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, curr
   const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedChats, setSelectedChats] = useState<string[]>([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const filteredChats = chats.filter(chat => chat.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const toggleChatSelection = (chatId: string) => {
@@ -42,43 +45,53 @@ export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, curr
   return (
     <>
       {/* Mobile overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
-          onClick={onClose}
-        />
-      )}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
+            onClick={onClose}
+          />
+        )}
+      </AnimatePresence>
       
       {/* Desktop spacer */}
-      <div className={clsx(
-        "hidden md:block flex-shrink-0 h-screen transition-all duration-300",
-        isOpen ? "w-[260px]" : "w-0"
-      )} />
+      <motion.div 
+        initial={false}
+        animate={{ width: isOpen ? 260 : 0 }}
+        transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+        className="hidden md:block flex-shrink-0 h-screen"
+      />
 
-      <aside className={clsx(
-        "fixed top-0 left-0 h-screen w-[260px] bg-[#f9f9f9] flex flex-col transition-transform duration-300 z-50",
-        isOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <motion.aside 
+        initial={false}
+        animate={{ x: isOpen ? 0 : -260 }}
+        transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+        className="fixed top-0 left-0 h-screen w-[260px] bg-slate-50/80 backdrop-blur-xl border-r border-slate-200/60 flex flex-col z-50 shadow-sm"
+      >
         <div className="p-3 flex items-center justify-between">
           <button
             onClick={onToggle}
-            className="hidden md:flex p-2 rounded-lg hover:bg-black/5 text-slate-600 transition-colors"
+            className="hidden md:flex p-2 rounded-lg hover:bg-slate-200/50 text-slate-600 transition-colors"
             title="Đóng sidebar"
           >
             <PanelLeftClose className="w-5 h-5" />
           </button>
           <button
             onClick={onClose}
-            className="md:hidden p-2 rounded-lg hover:bg-black/5 text-slate-600 transition-colors"
+            className="md:hidden p-2 rounded-lg hover:bg-slate-200/50 text-slate-600 transition-colors"
             title="Đóng sidebar"
           >
             <X className="w-5 h-5" />
           </button>
           <button
             onClick={onNewChat}
-            className="flex-1 flex items-center gap-3 hover:bg-black/5 text-slate-700 py-2 px-3 rounded-lg font-medium transition-colors text-sm ml-1"
+            className="flex-1 flex items-center gap-3 hover:bg-white bg-white/50 border border-slate-200/60 shadow-sm text-slate-700 py-2 px-3 rounded-lg font-medium transition-all text-sm ml-1"
           >
-            <div className="w-7 h-7 rounded-full bg-black/5 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
               <MessageSquarePlus className="w-4 h-4" />
             </div>
             <span>Cuộc trò chuyện mới</span>
@@ -188,8 +201,8 @@ export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, curr
                     className={clsx(
                       "w-full flex items-center justify-between px-2 py-2 rounded-lg transition-colors group text-sm",
                       currentChatId === chat.id
-                        ? "bg-black/5 text-slate-900"
-                        : "text-slate-700 hover:bg-black/5"
+                        ? "bg-white shadow-sm border border-slate-200/60 text-blue-700 font-medium"
+                        : "text-slate-700 hover:bg-slate-200/50"
                     )}
                   >
                     <button
@@ -232,18 +245,36 @@ export function Sidebar({ isOpen, onClose, onNewChat, onTopicSelect, chats, curr
             )}
           </div>
         </div>
-      </aside>
+
+        <div className="p-3 border-t border-slate-200/60">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium text-slate-700 hover:bg-slate-200/50 transition-colors group"
+          >
+            <Settings className="w-4 h-4 text-slate-500 group-hover:text-slate-700 transition-colors" />
+            <span>Cài đặt API</span>
+          </button>
+        </div>
+      </motion.aside>
 
       {/* Desktop expand button when sidebar is closed */}
-      {!isOpen && (
-        <button
-          onClick={onToggle}
-          className="hidden md:flex fixed top-3 left-3 z-40 p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
-          title="Mở sidebar"
-        >
-          <PanelLeftOpen className="w-5 h-5" />
-        </button>
-      )}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            onClick={onToggle}
+            className="hidden md:flex fixed top-3 left-3 z-40 p-2.5 bg-white/80 backdrop-blur-md border border-slate-200/60 shadow-sm rounded-xl hover:bg-slate-50 text-slate-600 transition-all hover:shadow-md"
+            title="Mở sidebar"
+          >
+            <PanelLeftOpen className="w-5 h-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
       {/* Delete All Confirmation Modal */}
       {showDeleteConfirm && (

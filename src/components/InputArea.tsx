@@ -2,12 +2,10 @@ import { SendHorizontal, Loader2, Sparkles, AlignLeft, List, Zap, Mic, Paperclip
 import { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { ResponseStyle, Attachment } from '../types';
-import { User } from 'firebase/auth';
 
 interface InputAreaProps {
   onSendMessage: (message: string, style: ResponseStyle, attachments?: Attachment[]) => void;
   isLoading: boolean;
-  user?: User | null;
 }
 
 const STYLES: { id: ResponseStyle; label: string; icon: any }[] = [
@@ -16,7 +14,7 @@ const STYLES: { id: ResponseStyle; label: string; icon: any }[] = [
   { id: 'simple', label: 'Dễ hiểu', icon: AlignLeft },
 ];
 
-export function InputArea({ onSendMessage, isLoading, user }: InputAreaProps) {
+export function InputArea({ onSendMessage, isLoading }: InputAreaProps) {
   const [input, setInput] = useState('');
   const [style, setStyle] = useState<ResponseStyle>('detailed');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -55,11 +53,6 @@ export function InputArea({ onSendMessage, isLoading, user }: InputAreaProps) {
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files) return;
-    
-    if (!user) {
-      alert('Vui lòng đăng nhập bằng tài khoản Google để sử dụng chức năng đính kèm tệp.');
-      return;
-    }
     
     if (attachments.length + files.length > 10) {
       alert('Chỉ được phép tải lên tối đa 10 tệp đính kèm.');
@@ -201,10 +194,6 @@ export function InputArea({ onSendMessage, isLoading, user }: InputAreaProps) {
   const handlePaste = (e: React.ClipboardEvent) => {
     if (e.clipboardData.files.length > 0) {
       e.preventDefault();
-      if (!user) {
-        alert('Vui lòng đăng nhập bằng tài khoản Google để sử dụng chức năng dán ảnh/tệp.');
-        return;
-      }
       handleFileUpload(e.clipboardData.files);
     }
   };

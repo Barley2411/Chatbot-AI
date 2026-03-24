@@ -1,7 +1,16 @@
 import { GoogleGenAI } from '@google/genai';
 import { ResponseStyle } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const getAIInstance = () => {
+  const customKey = localStorage.getItem('GEMINI_API_KEY');
+  const apiKey = customKey || process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('API_KEY_MISSING');
+  }
+  
+  return new GoogleGenAI({ apiKey });
+};
 
 const SYSTEM_PROMPT_BASE = `Bạn là "Trợ lý ảo Trung ương Đoàn TNCS Hồ Chí Minh" - một trợ lý ảo thông minh, cao cấp và chuyên nghiệp chuyên giải đáp MỌI thắc mắc liên quan đến Đoàn Thanh niên Cộng sản Hồ Chí Minh.
 
@@ -33,6 +42,7 @@ export async function generateChatResponse(
   style: ResponseStyle
 ): Promise<string> {
   try {
+    const ai = getAIInstance();
     const contents = messageHistory.map(msg => {
       const parts: any[] = [];
       

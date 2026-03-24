@@ -4,15 +4,13 @@ import { Copy, Check, User as UserIcon, ShieldCheck, RefreshCw, X, Download } fr
 import React, { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { User } from 'firebase/auth';
 
 interface MessageBubbleProps {
   message: Message;
   onRetry?: () => void;
-  user?: User | null;
 }
 
-export function MessageBubble({ message, onRetry, user }: MessageBubbleProps) {
+export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const [isCopied, setIsCopied] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
