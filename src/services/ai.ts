@@ -3,7 +3,7 @@ import { ResponseStyle } from '../types';
 
 const getAIInstance = () => {
   const customKey = localStorage.getItem('GEMINI_API_KEY');
-  const apiKey = customKey || process.env.GEMINI_API_KEY;
+  const apiKey = customKey || import.meta.env.VITE_GEMINI_API_KEY;
   
   if (!apiKey) {
     throw new Error('API_KEY_MISSING');
@@ -65,7 +65,7 @@ export async function generateChatResponse(
     });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-1.5-flash',
       contents: contents,
       config: {
         systemInstruction: SYSTEM_PROMPT_BASE + STYLE_PROMPTS[style],
